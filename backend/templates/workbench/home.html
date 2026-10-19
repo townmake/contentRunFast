@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}从选品导入 · AI Listing 优化{% endblock %}
+
+{% block content %}
+<h1 class="page-title">从选品导入</h1>
+<p class="page-sub">拉取选品 ProductListing 到本系统。连接：{{ xuanpin_cfg.http_base_url }} · Key {{ xuanpin_key_masked }}</p>
+
+{% if not xuanpin_key_ready %}
+<div class="alert alert-warning">
+  选品 Key 尚未生效。请到 <a href="{% url 'settings_xuanpin' %}">选品连接</a> 配置。
+</div>
+{% endif %}
+
+<div class="panel">
+  <h2 class="panel-title">选品可导入列表</h2>
+  <form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-auto">
+      <label class="form-label muted mb-1">关键词</label>
+      <input class="form-control form-control-sm" type="text" name="q" value="{{ filters.q }}">
+    </div>
+    <div class="col-auto">
+      <label class="form-label muted mb-1">状态</label>
+      <select class="form-select form-select-sm" name="status">
+        <option value="" {% if not filters.status %}selected{% endif %}>全部</option>
+        <option value="pending" {% if filters.status == 'pending' %}selected{% endif %}>pending</option>
+        <option value="online" {% if filters.status == 'online' %}selected{% endif %}>online</option>
+        <option value="offline" {% if filters.status == 'offline' %}selected{% endif %}>offline</option>
+      </select>
+    </div>
+    <div class="col-auto">
+      <label class="form-label muted mb-1">站点</label>
+      <select class="form-select form-select-sm" name="ml_site">
+        <option value="MLB" {% if filters.ml_site == 'MLB' %}selected{% endif %}>MLB</option>
+        <option value="MLM" {% if filters.ml_site == 'MLM' %}selected{% endif %}>MLM</option>
+      </select>
+    </div>
+    <div class="col-auto"><button class="btn btn-sm btn-outline-secondary" type="submit">筛选</button></div>
+  </form>
+
+  {% if xuanpin_list_error %}<div class="alert alert-danger">{{ xuanpin_list_error }}</div>{% endif %}
+  {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+
+  {% if xuanpin_items %}
+  <p class="muted">本页 {{ xuanpin_items|length }} 条（count={{ xuanpin_count }}）</p>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th></th><th>listing_id</th><th>标题</th><th>状态</th><th>SKU</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in xuanpin_items %}
+        <tr>
+          <td>{% if it.primary_image_url %}<img class="cover" src="{{ it.primary_image_url }}" alt="">{% else %}—{% endif %}</td>
+          <td>{{ it.listing_id }}</td>
+          <td>{{ it.title|default:it.listing_title }}</td>
+          <td>{{ it.status }}</td>
+          <td class="muted">{{ it.platform_sku|default:"—" }}</td>
+          <td>
+            {% if it.already_imported %}
+              <a class="btn btn-sm btn-outline-secondary" href="{% url 'workbench_detail' it.local_product_id %}">已导入 · 打开</a>
+            {% else %}
+              <form method="post" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="listing_id" value="{{ it.listing_id }}">
+                <input type="hidden" name="ml_site" value="{{ filters.ml_site }}">
+                <button class="btn btn-sm btn-success" type="submit">导入</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif not xuanpin_list_error %}
+  <p class="muted mb-0">选品侧没有可显示的 Listing。</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2 class="panel-title">手动导入</h2>
+  <form method="post" class="row g-2 align-items-end">
+    {% csrf_token %}
+    <div class="col-auto">
+      <label class="form-label muted mb-1">listing_id</label>
+      <input class="form-control form-control-sm" type="number" name="listing_id" value="{{ form.listing_id }}">
+    </div>
+    <div class="col-auto">
+      <label class="form-label muted mb-1">dev_project_id</label>
+      <input class="form-control form-control-sm" type="number" name="dev_project_id" value="{{ form.dev_project_id }}">
+    </div>
+    <div class="col-auto">
+      <label class="form-label muted mb-1">ml_site</label>
+      <select class="form-select form-select-sm" name="ml_site">
+        <option value="MLB" {% if form.ml_site == 'MLB' %}selected{% endif %}>MLB</option>
+        <option value="MLM" {% if form.ml_site == 'MLM' %}selected{% endif %}>MLM</option>
+      </select>
+    </div>
+    <div class="col-auto"><button class="btn btn-sm btn-success" type="submit">导入</button></div>
+  </form>
+</div>
+{% endblock %}

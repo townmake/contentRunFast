@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}选品连接 · 配置{% endblock %}
+
+{% block content %}
+<h1 class="page-title">选品连接</h1>
+<p class="page-sub">本系统只读拉取选品 Listing / 简报。Admin 配置优先于 .env。</p>
+
+<div class="panel">
+  <table class="table table-sm mb-3">
+    <tr><th style="width:160px">来源</th><td>{{ xuanpin_cfg.source }}</td></tr>
+    <tr><th>HTTP Base</th><td><code>{{ xuanpin_cfg.http_base_url|default:"（空）" }}</code></td></tr>
+    <tr><th>MCP Base</th><td><code>{{ xuanpin_cfg.mcp_base_url|default:"（空）" }}</code></td></tr>
+    <tr><th>API Key</th><td>{{ xuanpin_key_masked }}</td></tr>
+    <tr><th>默认站点</th><td>{{ xuanpin_cfg.default_ml_site }}</td></tr>
+    <tr><th>Fixture</th><td>{{ xuanpin_cfg.use_fixtures }}</td></tr>
+  </table>
+  <a class="btn btn-success" href="/admin/catalog/xuanpinconnectionsettings/">在 Admin 中编辑 / 测试连接</a>
+  <a class="btn btn-outline-secondary" href="{% url 'workbench_home' %}">去导入</a>
+</div>
+{% endblock %}

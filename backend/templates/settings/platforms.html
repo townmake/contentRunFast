@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}平台账号 · 配置{% endblock %}
+
+{% block content %}
+<h1 class="page-title">平台账号</h1>
+<p class="page-sub">MVP 优先美客多巴西（MLB）。W3 已接入读商品 / 写图片 Adapter。</p>
+
+<div class="panel">
+  <h2 class="panel-title">Mercado Libre</h2>
+  <table class="table table-sm">
+    <tr>
+      <th style="width:160px">Token</th>
+      <td>
+        {% if meli_token_ready %}
+          <span class="badge-soft badge-ok">已配置</span>
+          <span class="muted">来源 {{ meli_source }} · 站点 {{ meli_site }}</span>
+        {% else %}
+          <span class="badge-soft badge-warn">未配置</span>
+          <span class="muted">请在 .env 设置 MELI_ACCESS_TOKEN，或 Admin 平台账号 token_ref</span>
+        {% endif %}
+      </td>
+    </tr>
+    <tr>
+      <th>MELI_DRY_RUN</th>
+      <td>{% if meli_dry_run_env %}开启（默认模拟）{% else %}关闭{% endif %}</td>
+    </tr>
+    <tr>
+      <th>能力探测</th>
+      <td><code>{{ meli_capabilities }}</code></td>
+    </tr>
+  </table>
+  <a class="btn btn-outline-secondary btn-sm" href="/admin/platforms/platformaccount/">Admin · 平台账号</a>
+  <a class="btn btn-outline-secondary btn-sm" href="/admin/publish/publicationhistory/">Admin · 发布历史</a>
+</div>
+
+<div class="panel">
+  <h2 class="panel-title">使用说明</h2>
+  <ol class="mb-0">
+    <li>工作台绑定 Item ID（如 MLB…）</li>
+    <li>素材库审核通过至少一个版本</li>
+    <li>发布 Tab：先看发布前检查与当前线上图，再执行（无 Token 时勾选「模拟发布」）</li>
+    <li>历史 Tab：查看 before/after，可一键回滚到 snapshot_before</li>
+  </ol>
+</div>
+{% endblock %}

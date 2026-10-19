@@ -1,0 +1,385 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} · 工作台{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <div class="product-header">
+    {% if product.cover_image_url %}
+      <img class="hero" src="{{ product.cover_image_url }}" alt="">
+    {% endif %}
+    <div class="flex-grow-1">
+      <h1 class="page-title mb-1">{{ product.name }}</h1>
+      <div class="muted">
+        商品 #{{ product.id }}
+        · 选品 listing {{ product.xuanpin_listing_id|default:"—" }}
+        · SKU {{ product.internal_sku|default:"—" }}
+        · 待审 {{ pending_count }} / 已通过 {{ approved_count }}
+      </div>
+      <div class="muted">上次拉取：{{ product.xuanpin_fetched_at|date:"Y-m-d H:i:s"|default:"—" }}</div>
+      <div class="mt-2 d-flex gap-2 flex-wrap">
+        <form method="post" class="d-inline">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="refresh">
+          <input type="hidden" name="tab" value="context">
+          <button class="btn btn-sm btn-outline-secondary" type="submit">从选品刷新上下文</button>
+        </form>
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'products_list' %}">返回商品列表</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item"><a class="nav-link {% if tab == 'context' %}active{% endif %}" href="?tab=context">上下文</a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'generate' %}active{% endif %}" href="?tab=generate">生成</a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'assets' %}active{% endif %}" href="?tab=assets">素材库{% if pending_count %} ({{ pending_count }}){% endif %}</a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'publish' %}active{% endif %}" href="?tab=publish">发布</a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'history' %}active{% endif %}" href="?tab=history">历史</a></li>
+  <li class="nav-item"><a class="nav-link {% if tab == 'analysis' %}active{% endif %}" href="?tab=analysis">分析</a></li>
+</ul>
+
+{% if tab == 'context' %}
+<div class="panel">
+  <h2 class="panel-title">图片</h2>
+  {% if ctx.image_urls %}
+  <div class="thumbs">
+    {% for url in ctx.image_urls %}
+      <a href="{{ url }}" target="_blank" rel="noopener"><img src="{{ url }}" alt=""></a>
+    {% endfor %}
+  </div>
+  {% else %}<p class="muted mb-0">无图片</p>{% endif %}
+</div>
+<div class="panel">
+  <h2 class="panel-title">文案 / 卖点</h2>
+  <p><strong>{{ ctx.listing_title|default:ctx.title|default:product.name }}</strong></p>
+  {% if ctx.listing_bullets %}
+  <ul>{% for b in ctx.listing_bullets %}<li>{{ b }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% if ctx.listing_description %}<p class="muted">{{ ctx.listing_description }}</p>{% endif %}
+</div>
+<div class="panel">
+  <h2 class="panel-title">简报摘要</h2>
+  {% if ctx.brief %}
+  <p>{{ ctx.brief.report_excerpt|default:"（无报告摘要）" }}</p>
+  <p class="muted">source={{ ctx.brief.source|default:"—" }} · task={{ ctx.brief.task_id|default:"—" }}</p>
+  {% else %}<p class="muted mb-0">无简报数据</p>{% endif %}
+</div>
+<div class="panel">
+  <h2 class="panel-title">平台映射</h2>
+  {% if payload.platform_listings %}
+  <table class="table table-sm mb-0">
+    <thead><tr><th>平台</th><th>站点</th><th>Item</th><th>状态</th></tr></thead>
+    <tbody>
+    {% for pl in payload.platform_listings %}
+      <tr><td>{{ pl.platform }}</td><td>{{ pl.ml_site }}</td><td>{{ pl.item_id }}</td><td>{{ pl.sync_status }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted mb-0">尚未映射平台 Item</p>{% endif %}
+</div>
+
+{% elif tab == 'generate' %}
+<div class="panel">
+  <h2 class="panel-title">生成候选（W2）</h2>
+  <p class="muted">
+    当前未接真实图像供应商时，会基于选品上下文图生成多套「候选版本」，方便先走通审核流。
+    也可在下方手工上传图片作为候选。
+  </p>
+  <form method="post" class="row g-3">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="generate">
+    <input type="hidden" name="tab" value="generate">
+    <div class="col-md-3">
+      <label class="form-label">生成套数</label>
+      <input class="form-control" type="number" name="count" value="2" min="1" max="5">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">创意方向</label>
+      <input class="form-control" type="text" name="direction" placeholder="如：场景化主图 / 痛点对比">
+    </div>
+    <div class="col-md-5">
+      <label class="form-label">补充 Prompt</label>
+      <input class="form-control" type="text" name="prompt" placeholder="可选">
+    </div>
+    <div class="col-12">
+      <button class="btn btn-success" type="submit">生成候选</button>
+    </div>
+  </form>
+</div>
+<div class="panel">
+  <h2 class="panel-title">手工上传候选</h2>
+  <form method="post" enctype="multipart/form-data" class="row g-3">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="upload_version">
+    <input type="hidden" name="tab" value="generate">
+    <div class="col-md-6">
+      <label class="form-label">图片（可多选）</label>
+      <input class="form-control" type="file" name="images" accept="image/*" multiple required>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">创意方向 / 备注</label>
+      <input class="form-control" type="text" name="direction" placeholder="可选">
+    </div>
+    <div class="col-12">
+      <button class="btn btn-outline-success" type="submit">上传为待审版本</button>
+    </div>
+  </form>
+</div>
+
+{% elif tab == 'assets' %}
+<div class="panel">
+  <h2 class="panel-title">素材版本库</h2>
+  {% if versions %}
+    {% for v in versions %}
+    <div class="version-card">
+      <div>
+        {% if v.image_uris %}
+          <img class="cover" style="width:110px;height:110px" src="{{ v.image_uris.0 }}" alt="">
+        {% endif %}
+      </div>
+      <div>
+        <div>
+          <strong>{{ v.version_code }}</strong>
+          {% if v.review_status == 'pending_review' %}<span class="badge-soft badge-warn">待审</span>
+          {% elif v.review_status == 'approved' %}<span class="badge-soft badge-ok">已通过</span>
+          {% elif v.review_status == 'rejected' %}<span class="badge-soft badge-danger">已驳回</span>
+          {% else %}<span class="badge-soft">{{ v.review_status }}</span>{% endif %}
+          <span class="muted">· {{ v.model_name }}</span>
+        </div>
+        <div class="muted">{{ v.prompt|default:"（无 prompt）" }}</div>
+        <div class="thumbs mt-2">
+          {% for uri in v.image_uris %}
+            <a href="{{ uri }}" target="_blank" rel="noopener"><img src="{{ uri }}" alt=""></a>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="d-flex flex-column gap-1">
+        {% if v.review_status != 'approved' %}
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="review">
+          <input type="hidden" name="version_id" value="{{ v.id }}">
+          <input type="hidden" name="review_action" value="approve">
+          <input type="hidden" name="tab" value="assets">
+          <button class="btn btn-sm btn-success w-100" type="submit">通过</button>
+        </form>
+        {% endif %}
+        {% if v.review_status != 'rejected' %}
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="review">
+          <input type="hidden" name="version_id" value="{{ v.id }}">
+          <input type="hidden" name="review_action" value="reject">
+          <input type="hidden" name="tab" value="assets">
+          <button class="btn btn-sm btn-outline-danger w-100" type="submit">驳回</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <p class="muted mb-0">还没有素材版本。请到「生成」Tab 创建候选。</p>
+  {% endif %}
+</div>
+
+{% elif tab == 'publish' %}
+<div class="panel">
+  <h2 class="panel-title">平台链接</h2>
+  {% if platform_listings %}
+  <table class="table table-sm">
+    <thead><tr><th>平台</th><th>站点</th><th>Item</th><th>状态</th><th>当前版本</th></tr></thead>
+    <tbody>
+    {% for pl in platform_listings %}
+      <tr>
+        <td>{{ pl.platform }}</td>
+        <td>{{ pl.ml_site }}</td>
+        <td>{{ pl.item_id }}</td>
+        <td>{{ pl.sync_status }}</td>
+        <td>{{ pl.current_version_id|default:"—" }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">尚未绑定美客多 Item。请填写 Item ID（如 MLB1234567890）：</p>
+  {% endif %}
+  <form method="post" class="row g-2 align-items-end mt-2">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="link_platform">
+    <input type="hidden" name="tab" value="publish">
+    <div class="col-auto">
+      <label class="form-label muted mb-1">Item ID</label>
+      <input class="form-control form-control-sm" name="item_id" placeholder="MLB…" required>
+    </div>
+    <div class="col-auto">
+      <label class="form-label muted mb-1">站点</label>
+      <select class="form-select form-select-sm" name="ml_site">
+        <option value="MLB">MLB</option>
+        <option value="MLM">MLM</option>
+      </select>
+    </div>
+    <div class="col-auto"><button class="btn btn-sm btn-outline-success" type="submit">绑定 / 更新</button></div>
+  </form>
+</div>
+
+<div class="panel">
+  <h2 class="panel-title">发布前检查</h2>
+  <p class="muted">
+    Token：{% if meli_token_ready %}<span class="badge-soft badge-ok">已配置</span>{% else %}<span class="badge-soft badge-warn">未配置</span>{% endif %}
+    {% if meli_dry_run_env %}· 环境 MELI_DRY_RUN=1{% endif %}
+    · 已通过版本 {{ approved_count }}
+  </p>
+  {% if preflight %}
+  <ul class="mb-0">
+    {% for c in preflight.checks %}
+    <li>
+      {% if c.ok %}<span class="badge-soft badge-ok">OK</span>{% else %}<span class="badge-soft badge-danger">FAIL</span>{% endif %}
+      {{ c.name }} <span class="muted">{{ c.detail }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% if preflight.snapshot_before %}
+  <div class="mt-3">
+    <div class="muted mb-1">当前线上图片（发布前快照预览）</div>
+    <div class="thumbs">
+      {% for p in preflight.snapshot_before.pictures %}
+        {% if p.url %}<img src="{{ p.url }}" alt="{{ p.id }}">{% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  {% else %}
+  <p class="muted mb-0">需要：至少一个「已通过」版本 + 已绑定平台链接，才会自动跑检查。</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h2 class="panel-title">执行发布</h2>
+  {% if approved_versions and platform_listings %}
+  <form method="post" class="row g-3" onsubmit="return confirm('确认将把所选版本图片整表写回美客多？请再次核对 before/after。');">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="publish">
+    <input type="hidden" name="tab" value="publish">
+    <div class="col-md-4">
+      <label class="form-label">素材版本（已通过）</label>
+      <select class="form-select" name="version_id" required>
+        {% for v in approved_versions %}
+        <option value="{{ v.id }}">{{ v.version_code }} · {{ v.review_status }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">平台链接</label>
+      <select class="form-select" name="platform_listing_id" required>
+        {% for pl in platform_listings %}
+        <option value="{{ pl.id }}">{{ pl.ml_site }} · {{ pl.item_id }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">策略</label>
+      <select class="form-select" name="strategy">
+        <option value="replace_all">整表替换为版本图</option>
+        <option value="replace_main">版本图作主图，其后保留原图</option>
+      </select>
+    </div>
+    <div class="col-12 form-check">
+      <input class="form-check-input" type="checkbox" name="dry_run" value="1" id="dryRun"
+             {% if not meli_token_ready or meli_dry_run_env %}checked{% endif %}>
+      <label class="form-check-label" for="dryRun">
+        模拟发布（不写真实美客多，走 dry-run Adapter，仍写 publication_history）
+      </label>
+    </div>
+    <div class="col-12">
+      <button class="btn btn-success" type="submit">发布到美客多</button>
+    </div>
+  </form>
+  {% else %}
+  <p class="muted mb-0">请先在「素材库」通过至少一个版本，并绑定平台 Item。</p>
+  {% endif %}
+</div>
+
+{% elif tab == 'history' %}
+<div class="panel">
+  <h2 class="panel-title">发布历史 / 回滚</h2>
+  {% if publications %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>ID</th><th>Item</th><th>版本</th><th>状态</th><th>时间</th><th>前后图</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for h in publications %}
+        <tr>
+          <td>#{{ h.id }}</td>
+          <td>{{ h.platform_listing.item_id }}</td>
+          <td>{% if h.version %}{{ h.version.version_code }}{% else %}—{% endif %}</td>
+          <td>
+            {% if h.status == 'succeeded' %}<span class="badge-soft badge-ok">{{ h.status }}</span>
+            {% elif h.status == 'failed' %}<span class="badge-soft badge-danger">{{ h.status }}</span>
+            {% elif h.status == 'rolled_back' %}<span class="badge-soft badge-warn">{{ h.status }}</span>
+            {% else %}<span class="badge-soft">{{ h.status }}</span>{% endif %}
+          </td>
+          <td class="muted">{% if h.published_at %}{{ h.published_at|date:"Y-m-d H:i" }}{% else %}{{ h.created_at|date:"Y-m-d H:i" }}{% endif %}</td>
+          <td class="muted">
+            before {{ h.snapshot_before_json.pictures|length|default:0 }}
+            → after {{ h.snapshot_after_json.pictures|length|default:0 }}
+          </td>
+          <td>
+            {% if h.status == 'succeeded' and h.snapshot_before_json.pictures %}
+            <form method="post" class="d-inline" onsubmit="return confirm('确认回滚到发布前图片数组？');">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="rollback">
+              <input type="hidden" name="history_id" value="{{ h.id }}">
+              <input type="hidden" name="tab" value="history">
+              {% if h.snapshot_before_json.dry_run or not meli_token_ready %}
+              <input type="hidden" name="dry_run" value="1">
+              {% endif %}
+              <button class="btn btn-sm btn-outline-warning" type="submit">回滚</button>
+            </form>
+            {% endif %}
+            {% if h.error %}<div class="text-danger small">{{ h.error|truncatechars:80 }}</div>{% endif %}
+          </td>
+        </tr>
+        {% if h.snapshot_before_json.pictures or h.snapshot_after_json.pictures %}
+        <tr>
+          <td colspan="7">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="muted mb-1">Before</div>
+                <div class="thumbs">
+                  {% for p in h.snapshot_before_json.pictures %}
+                    {% if p.url %}<img src="{{ p.url }}" alt="">{% endif %}
+                  {% empty %}<span class="muted">—</span>{% endfor %}
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="muted mb-1">After</div>
+                <div class="thumbs">
+                  {% for p in h.snapshot_after_json.pictures %}
+                    {% if p.url %}<img src="{{ p.url }}" alt="">{% endif %}
+                  {% empty %}<span class="muted">—</span>{% endfor %}
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted mb-0">暂无发布记录。到「发布」Tab 执行一次（可先勾选模拟发布）。</p>
+  {% endif %}
+</div>
+
+{% elif tab == 'analysis' %}
+<div class="panel">
+  <h2 class="panel-title">效果分析（轻量）</h2>
+  <p class="muted mb-0">W4 交付：手工录入 CTR/花费/订单并对比版本。</p>
+</div>
+{% endif %}
+{% endblock %}

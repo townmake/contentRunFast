@@ -1,0 +1,7 @@
+from django.apps import AppConfig
+
+
+class PublishConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'apps.publish'
+    verbose_name = '发布中心'
